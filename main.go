@@ -1,26 +1,42 @@
 package main
 
 import (
-	"fmt"
+	"database/sql"
 	"log"
 	"net/http"
+	"os"
 	"sync/atomic"
+
+	"workspace/github.com/zdelk/chirpy/internal/database"
+
+	"github.com/joho/godotenv"
+	_ "github.com/lib/pq"
 )
 
 func main() {
+	godotenv.Load()
+	dbURL := os.Getenv("DB_URL")
+	db, err := sql.Open("postgres", dbURL)
+	if err != nil {
+		log.Fatalf("Error with db: %v", err)
+	}
+
+	dbQueries := database.New(db)
 	const filepathRoot = "."
 	const port = "8080"
 
 	sMux := http.NewServeMux()
 	apiCfg := apiConfig{
 		fileserverHits: atomic.Int32{},
+		DB:             dbQueries,
 	}
 
 	sMux.Handle("/app/", apiCfg.middlewareMetricsInc(http.StripPrefix("/app", http.FileServer(http.Dir(filepathRoot)))))
 
-	sMux.HandleFunc("/healthz", handlerReadiness)
-	sMux.HandleFunc("/metrics", apiCfg.handlerCount)
-	sMux.HandleFunc("/reset", apiCfg.handlerReset)
+	sMux.HandleFunc("GET /api/healthz", handlerReadiness)
+	sMux.HandleFunc("GET /admin/metrics", apiCfg.handlerCount)
+	sMux.HandleFunc("POST /admin/reset", apiCfg.handlerReset)
+	sMux.HandleFunc("POST /api/validate_chirp", handlerValidate)
 
 	localServer := &http.Server{
 		Addr:    ":" + port,
@@ -32,31 +48,7 @@ func main() {
 
 }
 
-func handlerReadiness(w http.ResponseWriter, req *http.Request) {
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(http.StatusText(http.StatusOK)))
-}
-
 type apiConfig struct {
 	fileserverHits atomic.Int32
-}
-
-func (cfg *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
-	cfg.fileserverHits.Add(1)
-
-	return next
-}
-
-func (cfg *apiConfig) handlerCount(w http.ResponseWriter, req *http.Request) {
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.WriteHeader(http.StatusOK)
-	w.Write(fmt.Appendf([]byte{}, "Hits: %d", cfg.fileserverHits.Load()))
-}
-
-func (cfg *apiConfig) handlerReset(w http.ResponseWriter, req *http.Request) {
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.WriteHeader(http.StatusOK)
-	cfg.fileserverHits.Swap(0)
-	w.Write(fmt.Appendf([]byte{}, "Hits: %d", cfg.fileserverHits.Load()))
+	DB             *database.Queries
 }
