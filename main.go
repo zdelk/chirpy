@@ -43,8 +43,9 @@ func main() {
 	sMux.Handle("/app/", apiCfg.middlewareMetricsInc(http.StripPrefix("/app", http.FileServer(http.Dir(filepathRoot)))))
 
 	sMux.HandleFunc("GET /api/healthz", handlerReadiness)
-	sMux.HandleFunc("POST /api/validate_chirp", handlerValidate)
+	// sMux.HandleFunc("POST /api/validate_chirp", handlerValidate)
 	sMux.HandleFunc("POST /api/users", apiCfg.handlerCreateUser)
+	sMux.HandleFunc("POST /api/chirps", apiCfg.handlerCreateChirp)
 
 	sMux.HandleFunc("GET /admin/metrics", apiCfg.handlerCount)
 	sMux.HandleFunc("POST /admin/reset", apiCfg.handlerReset)

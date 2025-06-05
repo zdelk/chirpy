@@ -1,26 +1,29 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"slices"
 	"strings"
+	"workspace/github.com/zdelk/chirpy/internal/database"
+
+	"github.com/google/uuid"
 )
 
-func handlerValidate(w http.ResponseWriter, r *http.Request) {
+func (cfg *apiConfig) handlerCreateChirp(w http.ResponseWriter, r *http.Request) {
+	// handlerValidate(w, r)
+
 	type parameters struct {
-		Body string `json:"body"`
+		Body   string    `json:"body"`
+		UserID uuid.UUID `json:"user_id"`
 	}
 
-	type returnVals struct {
-		// Valid        bool   `json:"valid"`
-		Body string `json:"body"`
-	}
 	decoder := json.NewDecoder(r.Body)
 	params := parameters{}
 	err := decoder.Decode(&params)
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Couldn't decode parameters", err)
+		respondWithError(w, http.StatusInternalServerError, "couldn't decode parameters", err)
 		return
 	}
 
@@ -45,7 +48,16 @@ func handlerValidate(w http.ResponseWriter, r *http.Request) {
 
 	cleanedText := strings.Join(cleanedWords, " ")
 
-	respondWithJson(w, http.StatusOK, returnVals{
-		Body: cleanedText,
+	newChirp, err := cfg.DB.CreateChirp(context.Background(), database.CreateChirpParams{
+		Body:   cleanedText,
+		UserID: params.UserID,
 	})
+
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "couldn't add chirp to db", err)
+		return
+	}
+
+	respondWithJson(w, http.StatusCreated, newChirp)
+
 }
