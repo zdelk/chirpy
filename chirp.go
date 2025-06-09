@@ -19,6 +19,10 @@ func (cfg *apiConfig) handlerCreateChirp(w http.ResponseWriter, r *http.Request)
 		UserID uuid.UUID `json:"user_id"`
 	}
 
+	type response struct {
+		Chirp
+	}
+
 	decoder := json.NewDecoder(r.Body)
 	params := parameters{}
 	err := decoder.Decode(&params)
@@ -58,6 +62,14 @@ func (cfg *apiConfig) handlerCreateChirp(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	respondWithJson(w, http.StatusCreated, newChirp)
+	respondWithJson(w, http.StatusCreated, response{
+		Chirp: Chirp{
+			ID:        newChirp.ID,
+			CreatedAt: newChirp.CreatedAt,
+			UpdatedAt: newChirp.UpdatedAt,
+			Body:      newChirp.Body,
+			UserID:    newChirp.UserID,
+		},
+	})
 
 }

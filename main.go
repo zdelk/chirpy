@@ -43,6 +43,8 @@ func main() {
 	sMux.Handle("/app/", apiCfg.middlewareMetricsInc(http.StripPrefix("/app", http.FileServer(http.Dir(filepathRoot)))))
 
 	sMux.HandleFunc("GET /api/healthz", handlerReadiness)
+	sMux.HandleFunc("GET /api/chirps", apiCfg.handlerGetChirps)
+	sMux.HandleFunc("GET /api/chirps/{chirpID}", apiCfg.handlerGetChirp)
 	// sMux.HandleFunc("POST /api/validate_chirp", handlerValidate)
 	sMux.HandleFunc("POST /api/users", apiCfg.handlerCreateUser)
 	sMux.HandleFunc("POST /api/chirps", apiCfg.handlerCreateChirp)
@@ -71,4 +73,12 @@ type User struct {
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 	Email     string    `json:"email"`
+}
+
+type Chirp struct {
+	ID        uuid.UUID `json:"id"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	Body      string    `json:"body"`
+	UserID    uuid.UUID `json:"user_id"`
 }
