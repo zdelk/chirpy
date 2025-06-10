@@ -5,11 +5,14 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"workspace/github.com/zdelk/chirpy/internal/auth"
+	"workspace/github.com/zdelk/chirpy/internal/database"
 )
 
 func (cfg *apiConfig) handlerCreateUser(w http.ResponseWriter, req *http.Request) {
 	type parameters struct {
-		Email string `json:"email"`
+		Password string `json:"password"`
+		Email    string `json:"email"`
 	}
 
 	type response struct {
@@ -24,8 +27,18 @@ func (cfg *apiConfig) handlerCreateUser(w http.ResponseWriter, req *http.Request
 		respondWithError(w, http.StatusInternalServerError, "Couldn't decode user", err)
 		return
 	}
+	hashedPassword, err := auth.HashPassword(params.Password)
+	if err != nil {
+		log.Printf("Error hashing password: %v", err)
+		respondWithError(w, http.StatusInternalServerError, "Couldn't hash password", err)
+		return
+	}
 
-	user, err := cfg.DB.CreateUser(context.Background(), params.Email)
+	user, err := cfg.DB.CreateUser(context.Background(), database.CreateUserParams{
+		Email:          params.Email,
+		HashedPassword: hashedPassword,
+	})
+
 	if err != nil {
 		log.Printf("Error creating User: %v", err)
 		respondWithError(w, http.StatusInternalServerError, "Couldn't create user", err)
@@ -34,10 +47,11 @@ func (cfg *apiConfig) handlerCreateUser(w http.ResponseWriter, req *http.Request
 
 	respondWithJson(w, http.StatusCreated, response{
 		User: User{
-			ID:        user.ID,
-			CreatedAt: user.CreatedAt,
-			UpdatedAt: user.UpdatedAt,
-			Email:     user.Email,
+			ID:             user.ID,
+			CreatedAt:      user.CreatedAt,
+			UpdatedAt:      user.UpdatedAt,
+			Email:          user.Email,
+			HashedPassword: user.HashedPassword,
 		},
 	})
 

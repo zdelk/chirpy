@@ -1,22 +1,23 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"net/http"
-	"os"
-
-	"github.com/joho/godotenv"
 )
 
-func (cfg *apiConfig) handlerReset(w http.ResponseWriter, req *http.Request) {
-	godotenv.Load()
-	if os.Getenv("PLATFORM") != "dev" {
+func (cfg *apiConfig) handlerReset(w http.ResponseWriter, r *http.Request) {
+	if cfg.platform != "dev" {
 		respondWithError(w, http.StatusForbidden, "forbidden", nil)
 	}
-	cfg.DB.DelUsers(context.Background())
+
+	err := cfg.DB.Reset(r.Context())
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Failed to reset the database: " + err.Error()))
+		return
+	}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
-	cfg.fileserverHits.Swap(0)
+	cfg.fileserverHits.Store(0)
 	w.Write(fmt.Appendf([]byte{}, "Hits: %d", cfg.fileserverHits.Load()))
 }

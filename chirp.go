@@ -6,17 +6,16 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+	"workspace/github.com/zdelk/chirpy/internal/auth"
 	"workspace/github.com/zdelk/chirpy/internal/database"
-
-	"github.com/google/uuid"
 )
 
 func (cfg *apiConfig) handlerCreateChirp(w http.ResponseWriter, r *http.Request) {
 	// handlerValidate(w, r)
 
 	type parameters struct {
-		Body   string    `json:"body"`
-		UserID uuid.UUID `json:"user_id"`
+		Body string `json:"body"`
+		// UserID uuid.UUID `json:"user_id"`
 	}
 
 	type response struct {
@@ -31,6 +30,25 @@ func (cfg *apiConfig) handlerCreateChirp(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	tokenString, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "couldn't retrieve bearer token", err)
+		return
+	}
+
+	userID, err := auth.ValidateJWT(tokenString, cfg.secret)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "error with validating jwt", err)
+		return
+	}
+
+	// if check != params.UserID {
+	// 	log.Println("Poster doesnt match acc")
+	// 	log.Printf("Poster: %s", params.UserID)
+	// 	log.Printf("acc: %s", check)
+	// 	respondWithError(w, http.StatusUnauthorized, "Unauthorized to post on acc", nil)
+	// 	return
+	// }
 	const maxChirpLength = 140
 
 	if len(params.Body) > maxChirpLength {
@@ -54,7 +72,7 @@ func (cfg *apiConfig) handlerCreateChirp(w http.ResponseWriter, r *http.Request)
 
 	newChirp, err := cfg.DB.CreateChirp(context.Background(), database.CreateChirpParams{
 		Body:   cleanedText,
-		UserID: params.UserID,
+		UserID: userID,
 	})
 
 	if err != nil {
