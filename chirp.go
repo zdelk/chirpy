@@ -8,6 +8,8 @@ import (
 	"strings"
 	"workspace/github.com/zdelk/chirpy/internal/auth"
 	"workspace/github.com/zdelk/chirpy/internal/database"
+
+	"github.com/google/uuid"
 )
 
 func (cfg *apiConfig) handlerCreateChirp(w http.ResponseWriter, r *http.Request) {
@@ -38,7 +40,7 @@ func (cfg *apiConfig) handlerCreateChirp(w http.ResponseWriter, r *http.Request)
 
 	userID, err := auth.ValidateJWT(tokenString, cfg.secret)
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "error with validating jwt", err)
+		respondWithError(w, http.StatusUnauthorized, "error with validating jwt", err)
 		return
 	}
 
@@ -89,5 +91,46 @@ func (cfg *apiConfig) handlerCreateChirp(w http.ResponseWriter, r *http.Request)
 			UserID:    newChirp.UserID,
 		},
 	})
+
+}
+
+func (cfg *apiConfig) handlerDeleteChirp(w http.ResponseWriter, r *http.Request) {
+	// Parse chirp ID
+	chirpID := r.PathValue("chirpID")
+	chirpUUID, err := uuid.Parse(chirpID)
+	if err != nil {
+		respondWithError(w, http.StatusForbidden, "failed to parse chirp id", err)
+		return
+	}
+
+	// Check existence and retrieve
+	chirp, err := cfg.DB.GetChirp(context.Background(), chirpUUID)
+	if err != nil {
+		respondWithError(w, http.StatusNotFound, "chirp doesnt exist", err)
+		return
+	}
+
+	// Check bearer token
+	token, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "no token present in header", err)
+		return
+	}
+	userID, err := auth.ValidateJWT(token, cfg.secret)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Couldn't validate JWT", err)
+		return
+	}
+
+	if userID != chirp.UserID {
+		respondWithError(w, http.StatusForbidden, "Request not from Author", err)
+		return
+	}
+	err = cfg.DB.DeleteChirp(context.Background(), chirpUUID)
+	if err != nil {
+		respondWithError(w, http.StatusNotFound, "Couldn't delete chirp", err)
+		return
+	}
+	respondWithJson(w, http.StatusNoContent, struct{}{})
 
 }

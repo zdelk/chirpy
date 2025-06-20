@@ -29,6 +29,10 @@ func main() {
 	if jwt_secret == "" {
 		log.Fatal("JWT_SECRET must be set")
 	}
+	api_key := os.Getenv("POLKA_KEY")
+	if api_key == "" {
+		log.Fatal("API key must be set")
+	}
 
 	db, err := sql.Open("postgres", dbURL)
 	if err != nil {
@@ -44,6 +48,7 @@ func main() {
 		DB:             dbQueries,
 		platform:       platform,
 		secret:         jwt_secret,
+		apiKey:         api_key,
 	}
 
 	sMux.Handle("/app/", apiCfg.middlewareMetricsInc(http.StripPrefix("/app", http.FileServer(http.Dir(filepathRoot)))))
@@ -51,10 +56,15 @@ func main() {
 	sMux.HandleFunc("GET /api/healthz", handlerReadiness)
 	sMux.HandleFunc("GET /api/chirps", apiCfg.handlerGetChirps)
 	sMux.HandleFunc("GET /api/chirps/{chirpID}", apiCfg.handlerGetChirp)
+	sMux.HandleFunc("DELETE /api/chirps/{chirpID}", apiCfg.handlerDeleteChirp)
 	// sMux.HandleFunc("POST /api/validate_chirp", handlerValidate)
 	sMux.HandleFunc("POST /api/users", apiCfg.handlerCreateUser)
 	sMux.HandleFunc("POST /api/login", apiCfg.handlerLogin)
 	sMux.HandleFunc("POST /api/chirps", apiCfg.handlerCreateChirp)
+	sMux.HandleFunc("POST /api/refresh", apiCfg.handlerRefresh)
+	sMux.HandleFunc("POST /api/revoke", apiCfg.handlerRevoke)
+	sMux.HandleFunc("POST /api/polka/webhooks", apiCfg.handlerUpgradeUser)
+	sMux.HandleFunc("PUT /api/users", apiCfg.handlerUpdateUser)
 
 	sMux.HandleFunc("GET /admin/metrics", apiCfg.handlerCount)
 	sMux.HandleFunc("POST /admin/reset", apiCfg.handlerReset)
@@ -74,6 +84,7 @@ type apiConfig struct {
 	DB             *database.Queries
 	platform       string
 	secret         string
+	apiKey         string
 }
 
 type User struct {
@@ -82,6 +93,7 @@ type User struct {
 	UpdatedAt      time.Time `json:"updated_at"`
 	Email          string    `json:"email"`
 	HashedPassword string    `json:"hashedpassword"`
+	IsChirpyRed    bool      `json:"is_chirpy_red"`
 }
 
 type Chirp struct {
